@@ -48,6 +48,21 @@ df = pd.DataFrame(rows, columns=["text", "search_term"])
 print("Done. Rows:", len(df))
 print(df["search_term"].value_counts())
 
+#%% Add header variable 
+
+
+# Extract header from the existing 'text' column
+def extract_header(fulltext: str) -> str:
+    if not isinstance(fulltext, str):
+        return ""
+    parts = fulltext.split("The New York Times", 1)
+    return parts[0].strip() if len(parts) == 2 else ""
+
+df["header"] = df["text"].apply(extract_header)
+
+
+
+
 #%% Data Processing and Wrangling
 
 def clean_middle(text: str) -> str:
@@ -182,7 +197,6 @@ print(avg_counts_series)
 df_out = df.drop(columns=["text", "text_clean"], errors="ignore")
 
 # Save to CSV
-df_out.to_csv("NYT_Dataset_Base.csv", index=False, encoding="utf-8")
-print("Saved:", "NYT_Dataset_Base.csv")
-
+df_out.to_csv("NYT_Dataset_Base3.csv", index=False, encoding="utf-8")
+print("Saved:", "NYT_Dataset_Base3.csv")
 
