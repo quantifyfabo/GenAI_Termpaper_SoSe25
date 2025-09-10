@@ -25,7 +25,7 @@ from hdbscan import HDBSCAN
 from bertopic import BERTopic
 
 # ========= 1) Load data =========
-DATA_PATH = "/Users/fabiangi/Documents/Goethe Uni/Uni_Projects/CSS_Gen_AI/Paper_GenAI_SoSe25/Data/NYT_Dataset_Base.csv"
+DATA_PATH = "//Paper_GenAI_SoSe25/Data/NYT_Dataset_Base.csv"
 NYT_Data_Base = pd.read_csv(DATA_PATH)
 texts = NYT_Data_Base["plain_text_hard"].fillna("").astype(str).tolist()
 
