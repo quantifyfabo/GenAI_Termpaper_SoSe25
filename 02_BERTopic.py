@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Robust BERTopic pipeline for ~1000 short English texts (NYT).
 - No UMAP (more stable)
@@ -10,9 +9,8 @@ Robust BERTopic pipeline for ~1000 short English texts (NYT).
 - Extra: TF-IDF fallback to compute clean topwords if BERTopic representation misbehaves
 """
 
-# ========= Environment & Imports =========
 import os
-os.environ["TOKENIZERS_PARALLELISM"] = "false"  # avoid HF tokenizers warning
+os.environ["TOKENIZERS_PARALLELISM"] = "false" 
 
 import numpy as np
 import pandas as pd
@@ -24,41 +22,32 @@ from sentence_transformers import SentenceTransformer
 from hdbscan import HDBSCAN
 from bertopic import BERTopic
 
-# ========= 1) Load data =========
 DATA_PATH = "//Paper_GenAI_SoSe25/Data/NYT_Dataset_Base.csv"
 NYT_Data_Base = pd.read_csv(DATA_PATH)
 texts = NYT_Data_Base["plain_text_hard"].fillna("").astype(str).tolist()
 
-# If you want to strictly keep only your 4 categories, uncomment:
-# allowed = {"Climate Change","Migration Policy","Economic Inequality","Digital Surveillance"}
-# mask = NYT_Data_Base["search_term"].isin(allowed)
-# texts = NYT_Data_Base.loc[mask, "plain_text_hard"].fillna("").astype(str).tolist()
 
-# ========= 2) Stopwords & Vectorizer =========
-# Custom NYT-ish stopwords seen in your outputs; merge with sklearn English stopwords
 custom_stop = {
     "ms","mr","mrs","percent","state","states","city","cities",
     "official","officials","york","new","times","said","say","says"
 }
-# IMPORTANT: use a LIST, not a set
 stopwords = list(text.ENGLISH_STOP_WORDS.union(custom_stop))
 
 vectorizer_model = CountVectorizer(
-    stop_words=stopwords,                   # ensure common stopwords are removed
-    ngram_range=(1, 2),                     # bigrams like "climate change", "data privacy"
-    min_df=2,                               # robust on ~1000 docs
+    stop_words=stopwords,              
+    ngram_range=(1, 2),                   
+    min_df=2,
     max_df=0.90,
     max_features=25000,
-    token_pattern=r"(?u)\b[a-zA-Z][a-zA-Z\-]{2,}\b",  # alphabetic tokens, length>=3, hyphens ok
+    token_pattern=r"(?u)\b[a-zA-Z][a-zA-Z\-]{2,}\b",  
     lowercase=True
 )
 
-# ========= 3) Embeddings (normalized) =========
+# 3
 embedder = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 embeddings = embedder.encode(texts, normalize_embeddings=True, show_progress_bar=True)
-# normalize_embeddings=True -> euclidean distance approximates cosine
 
-# ========= 4) HDBSCAN (no UMAP) =========
+# 3
 hdbscan_model = HDBSCAN(
     min_cluster_size=6,              # small enough to avoid collapsing to 3 topics
     min_samples=1,                   # tolerant, yields more raw clusters
@@ -67,7 +56,7 @@ hdbscan_model = HDBSCAN(
     prediction_data=True
 )
 
-# ========= 5) (Optional) Raw model for diagnostics (no reduction) =========
+# 5 optional
 topic_model_raw = BERTopic(
     embedding_model=embedder,
     vectorizer_model=vectorizer_model,
@@ -80,30 +69,28 @@ _raw_topics, _ = topic_model_raw.fit_transform(texts, embeddings=embeddings)
 raw_topic_ids = [t for t in topic_model_raw.get_topics().keys() if t != -1]
 print(f"[Diagnostics] Raw (pre-reduction) topic count (excl. -1): {len(raw_topic_ids)}")
 
-# ========= 6) Final model with reduction =========
-# Empirically on your corpus: nr_topics=5 yields 4 real topics (plus optional -1)
+# 6
 topic_model = BERTopic(
-    embedding_model=embedder,        # needed for reduce_outliers(strategy="embeddings")
+    embedding_model=embedder,   
     vectorizer_model=vectorizer_model,
     umap_model=None,
     hdbscan_model=hdbscan_model,
-    nr_topics=5,                     # <-- important for your data
+    nr_topics=5,                
     calculate_probabilities=True,
     verbose=False
 )
 
 topics, probs = topic_model.fit_transform(texts, embeddings=embeddings)
 
-# ========= 7) Reassign outliers (-1) =========
+# 7
 topics = topic_model.reduce_outliers(texts, topics, strategy="embeddings")
 topic_model.update_topics(texts, topics=topics)   # DO NOT pass embeddings here (v0.17.3)
 
-# ========= 8) Attach results =========
+# 8
 NYT_Data_Base["bert_topic_id"]   = topics
 NYT_Data_Base["bert_topic_conf"] = (np.max(probs, axis=1) if probs is not None else np.nan)
 
-# ========= 9) Topwords (two ways) =========
-# 9a) From BERTopic (expected to be clean if vectorizer_model is used)
+#9
 def show_topwords_from_bertopic(model, topn=15, skip_outlier=False):
     topic_ids = sorted(model.get_topics().keys())
     for tid in topic_ids:
@@ -115,7 +102,7 @@ def show_topwords_from_bertopic(model, topn=15, skip_outlier=False):
 print("\n=== Top words per topic (BERTopic) ===")
 show_topwords_from_bertopic(topic_model, topn=15, skip_outlier=False)
 
-# 9b) Fallback: compute clean topwords via TF-IDF per topic (guaranteed no 'the/of/and…')
+# 9b)
 def compute_topwords_tfidf(texts_list, topic_ids, topn=15):
     """Compute top words per topic via TF-IDF on aggregated per-topic texts."""
     # Build per-topic corpora
@@ -125,7 +112,7 @@ def compute_topwords_tfidf(texts_list, topic_ids, topn=15):
         agg[tid].append(txt)
     topic_docs = {tid: " ".join(docs) for tid, docs in agg.items()}
 
-    # TF-IDF with SAME stopwording/bigrams/token rules as the vectorizer_model
+    # TF-IDF 
     tfidf = TfidfVectorizer(
         stop_words=stopwords,
         ngram_range=(1, 2),
@@ -151,13 +138,13 @@ def compute_topwords_tfidf(texts_list, topic_ids, topn=15):
         topwords[tid] = feat[idx].tolist()
     return topwords
 
-# If BERTopic still shows stopwords (shouldn't), print the TF-IDF fallback:
+# 9c alternative
 print("\n=== Top words per topic (TF-IDF fallback) ===")
 tfidf_top = compute_topwords_tfidf(texts, topics, topn=15)
 for tid in sorted(tfidf_top.keys()):
     print(f"Topic {tid}: {', '.join(tfidf_top[tid])}")
 
-# ========= 10) Counts =========
+# 10
 print("\n=== Assignment counts (incl. -1) ===")
 print(pd.Series(topics).value_counts().sort_index())
 
@@ -191,8 +178,9 @@ NYT_Data_Base.to_csv("NYT_Dataset_w_Topics_v2.csv", index=False, encoding="utf-8
 print("Saved:", "NYT_Dataset_w_Topics_v2.csv")
 
 
-# Part 2 - Just for Comparison (these are not the final results of BERTopic)
-#%% BERTopic Alternative with Plain Text instead of plain_text_hard // now contains search terms within the text corpora // helps for additional comparison
+
+
+# Part 2 (Alternative) to check plain
 
 import re
 import numpy as np
