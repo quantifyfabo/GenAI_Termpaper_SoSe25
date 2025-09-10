@@ -189,3 +189,96 @@ except Exception as e:
 
 NYT_Data_Base.to_csv("NYT_Dataset_w_Topics_v2.csv", index=False, encoding="utf-8")
 print("Saved:", "NYT_Dataset_w_Topics_v2.csv")
+
+
+# Part 2 - Just for Comparison (these are not the final results of BERTopic)
+#%% BERTopic Alternative with Plain Text instead of plain_text_hard // now contains search terms within the text corpora // helps for additional comparison
+
+import re
+import numpy as np
+import spacy
+from bertopic import BERTopic
+from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import CountVectorizer
+from umap import UMAP
+from hdbscan import HDBSCAN
+
+nlp = spacy.load("en_core_web_sm", disable=["parser","ner"])
+def to_lemmas_nouns_adjs(text: str) -> str:
+    if not isinstance(text, str):
+        return ""
+    doc = nlp(text)
+    toks = []
+    for t in doc:
+        if t.is_stop or t.is_punct or t.is_space:
+            continue
+        if t.pos_ in {"NOUN","ADJ"}:
+            lemma = t.lemma_.lower()
+            if re.match(r"^[a-z][a-z\-]{1,}$", lemma):
+                toks.append(lemma)
+    return " ".join(toks)
+
+NYT_Data_Base["plain_text_lemma"] = (
+    NYT_Data_Base["plain_text"].fillna("").apply(to_lemmas_nouns_adjs)
+)
+
+docs = NYT_Data_Base["plain_text_lemma"].tolist()
+
+vectorizer = CountVectorizer(
+    stop_words="english",
+    ngram_range=(1, 2),
+    min_df=3,
+    max_df=1.0
+)
+
+embedder = SentenceTransformer("all-MiniLM-L6-v2")
+embeddings = embedder.encode(docs, batch_size=64, show_progress_bar=True)
+
+umap_model = UMAP(n_neighbors=15, n_components=5, min_dist=0.05,
+                  metric="cosine", random_state=42)
+hdbscan_model = HDBSCAN(min_cluster_size=20, min_samples=5,
+                        metric="euclidean", cluster_selection_method="eom",
+                        prediction_data=True)
+
+topic_model = BERTopic(
+    vectorizer_model=vectorizer,
+    umap_model=umap_model,
+    hdbscan_model=hdbscan_model,
+    calculate_probabilities=True,
+    verbose=False
+)
+
+topics, probs = topic_model.fit_transform(docs, embeddings=embeddings)
+res = topic_model.reduce_topics(docs, nr_topics=4)
+topic_model = res[0] if isinstance(res, tuple) else res
+
+new_topics, new_probs = topic_model.transform(docs, embeddings=embeddings)
+
+best_topic = np.array(new_topics)
+best_conf  = new_probs.max(axis=1)
+
+threshold = 0.35
+assigned = np.where(best_conf >= threshold, best_topic, -1)
+
+def get_top_words(model, topn=15):
+    out = {}
+    for tid in model.get_topic_info().Topic.unique():
+        if tid == -1:
+            continue
+        out[int(tid)] = [w for w, _ in model.get_topic(int(tid))[:topn]]
+    return out
+
+topic_topwords = get_top_words(topic_model, topn=15)
+
+NYT_Data_Base["bert_topic_id"]    = assigned
+NYT_Data_Base["bert_topic_conf"]  = best_conf
+NYT_Data_Base["bert_topic_words"] = [
+    ", ".join(topic_topwords.get(int(t), [])) if t != -1 else ""
+    for t in assigned
+]
+
+print("Assignment counts (incl. -1 by threshold):")
+print(NYT_Data_Base["bert_topic_id"].value_counts(dropna=False).sort_index())
+print("\nTop words per topic:")
+for k, ws in topic_topwords.items():
+    print(f"Topic {k}: {', '.join(ws)}")
