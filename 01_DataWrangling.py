@@ -18,7 +18,7 @@ from striprtf.striprtf import rtf_to_text
 #%% Loading Data into Dataframe
 
 # Absolute root (independent of CWD)
-root = Path("/Users/fabiangi/Documents/Goethe Uni/Uni_Projects/CSS_Gen_AI/Paper_GenAI_SoSe25/Data/Data_250_Raw")
+root = Path("/Paper_GenAI_SoSe25/Data/Data_250_Raw")
 
 folders = [
     "ClimateChange_NYT_250",
