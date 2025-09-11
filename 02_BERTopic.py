@@ -1,13 +1,4 @@
-"""
-Robust BERTopic pipeline for ~1000 short English texts (NYT).
-- No UMAP (more stable)
-- Normalized embeddings (euclidean ~= cosine)
-- HDBSCAN 'leaf' + small min_cluster_size (enough raw clusters)
-- CountVectorizer with English stopwords + custom newsy terms + bigrams
-- Outlier reassignment to reduce -1
-- Plotly visualizations open in default browser (Spyder-safe)
-- Extra: TF-IDF fallback to compute clean topwords if BERTopic representation misbehaves
-"""
+
 
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false" 
@@ -49,10 +40,10 @@ embeddings = embedder.encode(texts, normalize_embeddings=True, show_progress_bar
 
 # 3
 hdbscan_model = HDBSCAN(
-    min_cluster_size=6,              # small enough to avoid collapsing to 3 topics
-    min_samples=1,                   # tolerant, yields more raw clusters
-    metric="euclidean",              # ok since embeddings are normalized
-    cluster_selection_method="leaf", # more fine-grained than 'eom'
+    min_cluster_size=6,        
+    min_samples=1,        
+    metric="euclidean", 
+    cluster_selection_method="leaf", 
     prediction_data=True
 )
 
@@ -84,7 +75,7 @@ topics, probs = topic_model.fit_transform(texts, embeddings=embeddings)
 
 # 7
 topics = topic_model.reduce_outliers(texts, topics, strategy="embeddings")
-topic_model.update_topics(texts, topics=topics)   # DO NOT pass embeddings here (v0.17.3)
+topic_model.update_topics(texts, topics=topics)  
 
 # 8
 NYT_Data_Base["bert_topic_id"]   = topics
@@ -154,7 +145,7 @@ topic_map = {
     2: "Climate Change",
     1: "Migration Policy",
     3: "Economic Inequality",
-    4: "Other",        # if exists after reduction
+    4: "Other",       
     -1: "Unidentified"
 }
 NYT_Data_Base["bert_topic_name"] = NYT_Data_Base["bert_topic_id"].map(topic_map).fillna("Unidentified")
