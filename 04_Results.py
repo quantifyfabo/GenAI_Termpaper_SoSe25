@@ -10,7 +10,7 @@ import numpy as np
 from sklearn.metrics import classification_report
 
 # Results and Empirics
-NYT_Data_Base = pd.read_csv("/Users/fabiangi/Documents/Goethe Uni/Uni_Projects/CSS_Gen_AI/Paper_GenAI_SoSe25/Data/Zwischen_Datasets/NYT_Dataset_w_Topics_v2.csv")
+NYT_Data_Base = pd.read_csv("/NYT_Dataset_w_Topics_v2.csv")
 
 #%% Matches of search term and lda results
 matches = NYT_Data_Base["lda_topic_name"] == NYT_Data_Base["search_term"]
@@ -37,7 +37,7 @@ print(f"Übereinstimmungen: {count_matches} von {total_rows} ({count_matches/tot
 
 
 # 1) Load
-PATH = "/Users/fabiangi/Documents/Goethe Uni/Uni_Projects/CSS_Gen_AI/Paper_GenAI_SoSe25/Data/Zwischen_Datasets/NYT_Dataset_w_Topics_v2.csv"
+PATH = "/NYT_Dataset_w_Topics_v2.csv"
 df = pd.read_csv(PATH)
 
 # 2) Normalize strings (trim, keep case as-is)
@@ -53,16 +53,16 @@ lda_col  = next((c for c in df.columns if  "lda" in c.lower() and "name" in c.lo
 df["bert"] = df[bert_col].map(norm)
 df["lda"]  = df[lda_col].map(norm)
 
-# 3) Define the four target topics (exact strings)
+# 3)
 TARGET = ["Climate Change", "Migration Policy", "Economic Inequality", "Digital Surveillance"]
 
-# 4) Overall accuracy (all rows, exact string match)
+# 4) 
 acc_bert_all = (df["bert"] == df["true"]).mean()
 acc_lda_all  = (df["lda"]  == df["true"]).mean()
 print(f"BERT Overall Accuracy: {acc_bert_all:.2%}")
 print(f"LDA  Overall Accuracy: {acc_lda_all:.2%}")
 
-# 5) Accuracy restricted to the 4 topics (exclude anything outside the set)
+# 5) 
 mask_bert_4 = df["true"].isin(TARGET) & df["bert"].isin(TARGET)
 mask_lda_4  = df["true"].isin(TARGET) & df["lda"].isin(TARGET)
 
@@ -71,7 +71,7 @@ acc_lda_4  = (df.loc[mask_lda_4,  "lda"]  == df.loc[mask_lda_4,  "true"]).mean()
 print(f"BERT Accuracy (4 target topics only): {acc_bert_4:.2%}")
 print(f"LDA  Accuracy (4 target topics only): {acc_lda_4:.2%}")
 
-# 6) Confusion matrices (only the 4 target topics, fixed order)
+# 6) Confusion matrices 
 def confusion_subset(pred_col):
     sub = df[df["true"].isin(TARGET) & df[pred_col].isin(TARGET)].copy()
     labels = TARGET
@@ -87,7 +87,7 @@ print(cm_bert)
 print("\nConfusion Matrix (LDA):")
 print(cm_lda)
 
-# 7) Per-class recall (how often each true class is predicted correctly)
+# 7) 
 def per_class_recall(pred_col):
     g = (df.assign(correct=df[pred_col] == df["true"])
            .groupby("true")["correct"].mean()
@@ -99,7 +99,7 @@ print(per_class_recall("bert").apply(lambda x: f"{x:.2%}"))
 print("\nPer-class recall (LDA):")
 print(per_class_recall("lda").apply(lambda x: f"{x:.2%}"))
 
-# (Optional) Detailed classification report (only 4 topics)
+#  classification report
 sub_bert = df[df["true"].isin(TARGET) & df["bert"].isin(TARGET)]
 sub_lda  = df[df["true"].isin(TARGET) & df["lda"].isin(TARGET)]
 print("\nClassification report (BERT, 4 topics):")
@@ -117,7 +117,6 @@ print(df["lda"].value_counts(dropna=False))
 print("\nBERT predicts 'Economic Inequality' at least once?:",
       (df["bert"] == "Economic Inequality").any())
 
-#  check majority mapping per topic_id
 if "bert_topic_id" in df.columns:
     maj = (df[df["bert_topic_id"] != -1]
              .groupby("bert_topic_id")["true"]
@@ -126,14 +125,12 @@ if "bert_topic_id" in df.columns:
     print(maj)
 
 #%%  why is Economic Inequality not covered in BERTopic?
-# Wohin wandern die wahren EI-Fälle bei BERT?
 df[df["search_term"]=="Economic Inequality"]["bert"].value_counts() #they mainly go to Digital Surveillance
 
 # Was steckt in den Outliers?
 df[df.get("bert_topic_id", -1) == -1]["search_term"].value_counts()
 
 #%% Tables and Output Results as Reports
-
 #  4-class evaluation + HTML report for LDA, BERTopic, LLM
 
 import os
@@ -143,7 +140,7 @@ import pandas as pd
 from sklearn.metrics import f1_score, confusion_matrix
 
 # load daa
-PATH = "/Users/fabiangi/Documents/Goethe Uni/Uni_Projects/CSS_Gen_AI/Paper_GenAI_SoSe25/Data/Zwischen_Datasets/NYT_Dataset_w_Topics_v2_with_LLM.csv"
+PATH = "/NYT_Dataset_w_Topics_v2_with_LLM.csv"
 
 TARGET = ["Climate Change", "Migration Policy", "Economic Inequality", "Digital Surveillance"]
 
