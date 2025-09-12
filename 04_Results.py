@@ -260,6 +260,40 @@ for name, col in models:
     print("\nConfusion matrix (rows=true, cols=pred):")
     print(cm)
     # HTML-Report
+
+
+    #%% Check cases where all models failed to predict the right label
+
+import pandas as pd
+
+# Falls df noch nicht geladen ist:
+# df = pd.read_csv("NYT_Data_Final.csv")
+
+mask = (
+    (df["lda_topic_name"]  != df["search_term"]) &
+    (df["bert_topic_name"] != df["search_term"]) &
+    (df["llm_topic_name"]  != df["search_term"])
+)
+
+tri_df = df.loc[mask, [
+    "search_term",
+    "header",
+    "plain_text",
+    "lda_topic_name",
+    "bert_topic_name",
+    "llm_topic_name"
+]]
+
+# Optional speichern
+# tri_df.to_csv("tri_misclassified_subset.csv", index=False)
+
+print(tri_df.head())
+
+# Verteilung der wahren Topics
+distribution = tri_df["search_term"].value_counts()
+
+print(distribution)
+
     report_path = html_report(name, metrics, cm, used, total, out_dir)
     print(f"[{name}] HTML report: {report_path}")
 
